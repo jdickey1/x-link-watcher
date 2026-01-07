@@ -1,72 +1,103 @@
 # X Link Watcher
 
-Monitors an Obsidian vault for X/Twitter links and queues them for processing.
+Watches your Obsidian vault for X/Twitter links, fetches thread content, and analyzes them with Claude.
 
 ## How It Works
 
-1. Watches your Obsidian vault for file changes (using inotifywait)
-2. When you add an X link to any markdown file (e.g., daily notes), it detects it
-3. Adds the link to `x-link-queue.md` with metadata
-4. Tracks processed links to avoid duplicates
+```
+Daily Note → Detect X Link → Fetch Thread → Claude Analysis → Obsidian Note
+   (2 clicks)     (instant)      (jina.ai)      (API call)      (x-analyses/)
+```
+
+1. You share an X link to your daily note (iOS share sheet, etc.)
+2. Watcher detects the file change via inotifywait
+3. Fetches the thread content using jina.ai reader
+4. Sends to Claude API for categorization and analysis
+5. Writes structured analysis to `x-analyses/` folder in your vault
 
 ## Installation
 
 ```bash
-# Clone the repo
-git clone https://github.com/YOURUSER/x-link-watcher.git
+git clone https://github.com/jdickey1/x-link-watcher.git
 cd x-link-watcher
 
-# Install as systemd service (defaults to obsidian user)
-./install.sh
+# Install as systemd service
+./install.sh obsidian /path/to/vault
 
-# Or specify user and vault path
-./install.sh myuser /path/to/vault
+# Add your Anthropic API key to the service
+sudo systemctl edit x-link-watcher
+# Add: Environment=ANTHROPIC_API_KEY=sk-ant-...
 ```
 
-## Usage
-
-Just add X links to any markdown file in your vault. The watcher will automatically queue them in `x-link-queue.md`:
-
-```markdown
-# x-link-queue.md
-
-## Pending
-
-- [ ] https://x.com/someuser/status/123456789
-  - Source: 2026-01-07.md
-  - Added: 2026-01-07 14:30
+Or manually:
+```bash
+# Create service file
+sudo cp x-link-watcher.service /etc/systemd/system/
+sudo systemctl daemon-reload
+sudo systemctl enable --now x-link-watcher
 ```
 
 ## Configuration
 
-Environment variables (set in systemd service or shell):
+Environment variables (set in systemd service):
 
 | Variable | Default | Description |
 |----------|---------|-------------|
 | `VAULT_DIR` | `/home/obsidian/automation-vault` | Obsidian vault path |
-| `QUEUE_FILE` | `$VAULT_DIR/x-link-queue.md` | Where to write queued links |
-| `STATE_DIR` | `~/.local/state/x-link-watcher` | State/processed links storage |
+| `OUTPUT_DIR` | `$VAULT_DIR/x-analyses` | Where analysis notes go |
+| `ANTHROPIC_API_KEY` | (required) | Your Claude API key |
 
-## Service Commands
+## Output Format
+
+Each analyzed link creates a note like:
+
+```markdown
+# X Analysis: @username
+
+**Source**: https://x.com/user/status/123
+**Analyzed**: 2026-01-07 14:30
+**From**: 2026-01-07.md
+
+---
+
+1. **Summary**: Brief description of the post
+2. **Category**: tech/politics/business/culture/science/other
+3. **Key Claims**: Bullet points of factual claims
+4. **Sentiment**: positive/negative/neutral/mixed
+5. **Worth Following Up?**: yes/no + reason
+
+---
+
+## Raw Content
+(fetched thread content)
+```
+
+## Commands
 
 ```bash
-sudo systemctl status x-link-watcher    # Check status
-sudo systemctl restart x-link-watcher   # Restart
 sudo journalctl -u x-link-watcher -f    # Follow logs
+sudo systemctl restart x-link-watcher   # Restart
+sudo systemctl status x-link-watcher    # Check status
 ```
 
-## Processing the Queue
+## Manual Processing
 
-The queue file is plain markdown with checkboxes. Process it however you like:
-
-- Manually review and check off items
-- Script that feeds links to an AI for analysis
-- Integration with other tools
-
-Example processing script (not included):
+Process a single link:
 ```bash
-# Extract unchecked links and process with claude-code
-grep '^\- \[ \] https' x-link-queue.md | sed 's/- \[ \] //' | while read link; do
-    claude -p "Analyze this X post: $link" >> analysis.md
-done
+export ANTHROPIC_API_KEY=sk-ant-...
+./process-link.sh "https://x.com/user/status/123"
 ```
+
+## How Content is Fetched
+
+Uses [jina.ai reader](https://jina.ai/reader/) to fetch X content:
+- Free, no authentication needed
+- Handles JavaScript rendering
+- Returns clean markdown
+
+## Dependencies
+
+- `inotify-tools` - file watching
+- `curl` - HTTP requests
+- `jq` - JSON processing
+- Anthropic API key
