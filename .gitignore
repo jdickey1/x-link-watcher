@@ -1,0 +1,5 @@
+# State files (per-machine)
+.processed-links
+
+# OS
+.DS_Store
