@@ -1,0 +1,15 @@
+{
+  "name": "x-link-watcher",
+  "version": "1.0.0",
+  "description": "Watches your Obsidian vault for X/Twitter links, fetches thread content, and analyzes them with Claude.",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "dependencies": {
+    "playwright": "^1.57.0"
+  }
+}
